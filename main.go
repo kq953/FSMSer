@@ -8,11 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"proto"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	"proto"
 )
 
 var (
@@ -107,7 +107,7 @@ func handler(conn net.Conn) {
 		}
 		//根据协议处理
 		switch info[0] {
-		case "RERUN":	//重新编译项目
+		case "RERUN": //重新编译项目
 			proStrChan <- info[1]
 		default:
 			fmt.Println("错误协议请求")
@@ -120,7 +120,7 @@ func execCommand() {
 	defer wg.Done()
 	proArr := make(map[string]int8)
 	for {
-		proName, ok := <- proStrChan
+		proName, ok := <-proStrChan
 		if !ok {
 			return
 		}
@@ -128,8 +128,8 @@ func execCommand() {
 		//等待1秒，去除多次无效的重复编译
 		time.Sleep(time.Second)
 		if l := len(proStrChan); l > 0 {
-			for i:=0; i<l; i++ {
-				proName = <- proStrChan
+			for i := 0; i < l; i++ {
+				proName = <-proStrChan
 				if _, ok := proArr[proName]; !ok {
 					proArr[proName] = 1
 				}
@@ -149,7 +149,7 @@ func execCommand() {
 				syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 				delete(cmdList, proName)
 				//等待关闭
-				<- stopList[proName]
+				<-stopList[proName]
 			}
 			wg.Add(1)
 			go exeShell(proName)
@@ -171,7 +171,7 @@ func exeShell(proName string) {
 	mainFile.WriteString("/src/")
 	mainFile.WriteString(proName)
 	mainFile.WriteString("/main.go")
-	_,err := os.Stat(mainFile.String())
+	_, err := os.Stat(mainFile.String())
 	if err != nil {
 		fmt.Println(proName, "项目无main.go文件 忽略")
 		return
@@ -192,6 +192,8 @@ func exeShell(proName string) {
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	out, _ := cmd.StdoutPipe()
+	errOut, _ := cmd.StderrPipe()
+
 	outList = append(outList, out)
 	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), " building...")
 	err = cmd.Start()
@@ -200,8 +202,9 @@ func exeShell(proName string) {
 		return
 	}
 	//异步打印
-	wg.Add(1)
+	wg.Add(2)
 	go syncPrint(out)
+	go syncPrint(errOut)
 	cmdList[proName] = cmd
 	//fmt.Println("pid:", cmd.Process.Pid)
 	err = cmd.Wait()
