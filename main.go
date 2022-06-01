@@ -126,7 +126,7 @@ func execCommand() {
 		}
 		proArr[proName] = 1
 		//等待1秒，去除多次无效的重复编译
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond * 500)
 		if l := len(proStrChan); l > 0 {
 			for i := 0; i < l; i++ {
 				proName = <-proStrChan
@@ -151,6 +151,7 @@ func execCommand() {
 				//等待关闭
 				<-stopList[proName]
 			}
+			fmt.Println("\n\n目录：", proName)
 			wg.Add(1)
 			go exeShell(proName)
 		}
